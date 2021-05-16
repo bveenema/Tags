@@ -48,28 +48,10 @@ public:
     T AlarmHigh;
     T Current;
 
-    explicit TagBase(){}
-
-    explicit TagBase(Tag::Description<T> tag):
-    Min(tag.Min),
-    Max(tag.Max),
-    AlarmLow(tag.AlarmLow),
-    AlarmHigh(tag.AlarmHigh),
-    Default(tag.Default)
+    explicit TagBase()
     {
-        strcpy(Name, tag.Name);
-        strcpy(Unit, tag.Unit);
+        Index = LastIndex++;
 
-        if(tag.Index)
-        {
-            Index = tag.Index;
-            LastIndex = tag.Index;
-        }
-        else
-        {
-            Index = LastIndex + 1;
-            LastIndex = Index;
-        }
         AlarmState = false;
     }
 
@@ -152,11 +134,6 @@ public:
         Default = 0;
         AlarmLow = 0;
         AlarmHigh = 100;
-    }
-
-    TagInt(Tag::Description<int32_t> tag) : TagBase<int32_t>(tag)
-    {
-        _type = Tag::Int;
     }
 
     using TagBase<int32_t>::operator const int32_t;
