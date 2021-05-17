@@ -34,8 +34,6 @@ struct Description
 protected:
     static uint32_t LastIndex;
 };
-
-uint32_t Tag::LastIndex = 0;
 template <typename T>
 class TagBase : public Tag
 {
