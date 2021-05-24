@@ -18,8 +18,8 @@ public:
     };
 
 
-template <typename T>
-struct Description
+    template <typename T>
+    struct Description
     {
         uint32_t Index;
         char Name[32];
@@ -31,15 +31,23 @@ struct Description
         T AlarmHigh;
     };
 
+    char Name[32];
+    char Unit[12];
+
+    virtual Tag::Type GetType();
+    virtual uint32_t GetIndex();
+    virtual void OnChange(void (*callback)(Tag& tag, void* current, const void* previous));
+
 protected:
     static uint32_t LastIndex;
+    uint32_t Index;
+    Tag::Type _type;
 };
+
 template <typename T>
 class TagBase : public Tag
 {
 public:
-    char Name[32];
-    char Unit[12];
     T Min;
     T Max;
     T AlarmLow;
@@ -57,7 +65,7 @@ public:
 
     uint32_t GetIndex() {return Index;}
 
-    void OnChange(void (*callback)(TagBase<T> &tag, const T, const T, const Tag::Type type) )
+    void OnChange(void (*callback)(Tag& tag, void* current, const void* previous))
     {
         onChange = callback;
     }
@@ -85,18 +93,16 @@ public:
     T operator -- (int) { T temp = Current--;  HandleAssignment(); return temp; }
 
 protected:
-    uint32_t Index;
     T Default, Previous;
     bool AlarmState;
-    Tag::Type _type;
 
-    void (*onChange)(TagBase<T> &tag, const T current, const T previous, const Tag::Type type);
+    void (*onChange)(Tag& tag, void* current, const void* previous);
 
     T HandleAssignment()
     {
         // if new value, call onChange function
         if(Previous != Current)
-            if(onChange) onChange(*this, Current, Previous, _type);
+            if(onChange) onChange(*this, &Current, &Previous);
 
         Previous = Current;
 
