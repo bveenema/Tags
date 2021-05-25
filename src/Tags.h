@@ -2,6 +2,7 @@
 #define _TAGS_H_
 
 #include <Arduino.h>
+#include <forward_list>
 
 class Tag
 {
@@ -31,13 +32,15 @@ public:
         T AlarmHigh;
     };
 
+    typedef void (*OnChangeCallback)(Tag& tag, void* current, const void* previous);
+
     char Name[32];
     char Unit[12];
 
     virtual Tag::Type GetType();
     virtual uint32_t GetIndex();
-    virtual void OnChange(void (*callback)(Tag& tag, void* current, const void* previous));
-
+    virtual void OnChange(Tag::OnChangeCallback callback);
+    virtual void RemoveOnChange(Tag::OnChangeCallback callback);
 protected:
     static uint32_t LastIndex;
     uint32_t Index;
@@ -52,7 +55,7 @@ public:
     T Max;
     T AlarmLow;
     T AlarmHigh;
-    T Current;
+    T cValue;
 
     explicit TagBase()
     {
@@ -65,48 +68,75 @@ public:
 
     uint32_t GetIndex() {return Index;}
 
-    void OnChange(void (*callback)(Tag& tag, void* current, const void* previous))
+    void OnChange(Tag::OnChangeCallback callback)
     {
-        onChange = callback;
+        // Check if callback is already in the list
+        if(!OnChangeCallbacks.empty())
+        {
+            auto c = OnChangeCallbacks.begin();
+            while(c != OnChangeCallbacks.end())
+            {
+                if(*c == callback) return;
+                c++;
+            }
+        }
+        
+        OnChangeCallbacks.push_front(callback);
+    }
+
+    void RemoveOnChange(Tag::OnChangeCallback callback)
+    {
+        OnChangeCallbacks.remove(callback);
     }
 
     // Assignment Operators
-    T operator   = (const T &value) { Current   = value; return HandleAssignment(); }
-    T operator  += (const T &value) { Current  += value; return HandleAssignment(); }
-    T operator  -= (const T &value) { Current  -= value; return HandleAssignment(); }
-    T operator  *= (const T &value) { Current  *= value; return HandleAssignment(); }
-    T operator  /= (const T &value) { Current  /= value; return HandleAssignment(); }
-    T operator  %= (const T &value) { Current  %= value; return HandleAssignment(); }
-    T operator  &= (const T &value) { Current  &= value; return HandleAssignment(); }
-    T operator  |= (const T &value) { Current  |= value; return HandleAssignment(); }
-    T operator  ^= (const T &value) { Current  ^= value; return HandleAssignment(); }
-    T operator <<= (const T &value) { Current <<= value; return HandleAssignment(); }
-    T operator >>= (const T &value) { Current >>= value; return HandleAssignment(); }
+    T operator   = (const T &v) { cValue   = v; return HandleAssignment(); }
+    T operator  += (const T &v) { cValue  += v; return HandleAssignment(); }
+    T operator  -= (const T &v) { cValue  -= v; return HandleAssignment(); }
+    T operator  *= (const T &v) { cValue  *= v; return HandleAssignment(); }
+    T operator  /= (const T &v) { cValue  /= v; return HandleAssignment(); }
+    T operator  %= (const T &v) { cValue  %= v; return HandleAssignment(); }
+    T operator  &= (const T &v) { cValue  &= v; return HandleAssignment(); }
+    T operator  |= (const T &v) { cValue  |= v; return HandleAssignment(); }
+    T operator  ^= (const T &v) { cValue  ^= v; return HandleAssignment(); }
+    T operator <<= (const T &v) { cValue <<= v; return HandleAssignment(); }
+    T operator >>= (const T &v) { cValue >>= v; return HandleAssignment(); }
 
     // "Get Value" Operator
-    operator const T () const {return Current;}
+    operator const T () const {return cValue;}
 
     // Increment/Decrement Operators
-    T operator ++ () { ++Current; return HandleAssignment(); }
-    T operator -- () { --Current; return HandleAssignment(); }
-    T operator ++ (int) { T temp = Current++;  HandleAssignment(); return temp; }
-    T operator -- (int) { T temp = Current--;  HandleAssignment(); return temp; }
+    T operator ++ () { ++cValue; return HandleAssignment(); }
+    T operator -- () { --cValue; return HandleAssignment(); }
+    T operator ++ (int) { T temp = cValue++;  HandleAssignment(); return temp; }
+    T operator -- (int) { T temp = cValue--;  HandleAssignment(); return temp; }
 
 protected:
-    T Default, Previous;
+    T Default, pValue;
     bool AlarmState;
 
-    void (*onChange)(Tag& tag, void* current, const void* previous);
+    std::forward_list<Tag::OnChangeCallback> OnChangeCallbacks;
 
     T HandleAssignment()
     {
-        // if new value, call onChange function
-        if(Previous != Current)
-            if(onChange) onChange(*this, &Current, &Previous);
+        // if new value, call all OnChange callbacks
+        if(pValue != cValue)
+        {
+            if(!OnChangeCallbacks.empty())
+            {
+                auto callback = OnChangeCallbacks.begin();
+                while(callback != OnChangeCallbacks.end())
+                {
+                    if(*callback)
+                        (*callback)(*this, &cValue, &pValue);
+                    callback++;
+                }
+            }
+        }
 
-        Previous = Current;
+        pValue = cValue;
 
-        return Current;
+        return cValue;
     }
 };
 
